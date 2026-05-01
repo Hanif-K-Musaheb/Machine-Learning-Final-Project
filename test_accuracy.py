@@ -4,14 +4,8 @@ from model import CityGuesserTransfer
 import constants as c
 
 def run_final_exam():
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
 
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-
-    else:
-        device = torch.device("cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Loading grading system on: {device}")
 
     _, _, test_loader = get_data_loaders(batch_size=32)
@@ -42,8 +36,18 @@ def run_final_exam():
         for images, labels in test_loader:
             images, labels = images.to(device), labels.to(device)
             
-            predictions = model(images)
-            _, predicted_classes = torch.max(predictions, 1)
+            #predictions = model(images)
+            #_, predicted_classes = torch.max(predictions, 1)
+
+            predictions_original = model(images)
+            flipped_images = torch.flip(images, dims=[3])
+            predictions_flipped = model(flipped_images)
+
+            probs_original = F.softmax(predictions_original, dim=1)
+            probs_flipped = F.softmax(predictions_flipped, dim=1)
+
+            avg_probs = (probs_original + probs_flipped) / 2
+            predicted_classes = torch.argmax(avg_probs, dim=1)
             
             overall_total += labels.size(0)
             overall_correct += (predicted_classes == labels).sum().item()
@@ -58,7 +62,6 @@ def run_final_exam():
                 
                 if true_label == guessed_label:
                     class_correct[city_name] += 1
-
 
     city_name_convert_dict={"OSL":"Oslo",
                             "PRG":"Prague",
